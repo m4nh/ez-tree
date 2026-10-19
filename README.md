@@ -140,3 +140,29 @@ The `leaves` object defines properties that control the appearance and placement
 - **`tint`**: Tint color applied to the leaves, defined as a hexadecimal color value (e.g., `0xffffff` for white).
 - **`alphaTest`**: Sets the alpha threshold for leaf transparency, controlling the transparency of the leaf textures.
 
+
+## Fruit Parameters
+
+Fruits are an app-side feature (`src/app/fruits.js`), not part of `TreeOptions`. The `Fruits` class scatters instanced copies of a GLB model over the tree, anchored to the leaf and branch positions in `tree.skeleton`, and re-scatters automatically whenever the tree is regenerated. Models are normalized to a unit size and pivoted at their topmost point (usually the stem) so they hang below their anchor. Custom models can be added with **Upload GLB…** or by dragging a `.glb` file onto the page. The `FruitOptions` object defines the following properties.
+
+- **`enabled`**: Boolean value that shows (`true`) or hides (`false`) the fruits.
+- **`model`**: Name of the fruit model to use (e.g., `'Red Apple'`), either a built-in model from `FruitModels` or an uploaded one.
+- **`anchor`**: Where fruits grow, selected from the `FruitAnchor` enumeration: `Leaves` (at leaf attachment points) or `Twigs` (on the surface of thin branches).
+- **`density`**: Fraction of candidate anchors (from `0` to `1`) that receive a fruit. Increasing it adds fruits without reshuffling existing ones.
+- **`maxCount`**: Maximum number of fruits to place.
+- **`seed`**: Seed for fruit placement, independent of the tree seed so fruits never change the tree's shape.
+- **`spacing`**: Minimum distance between fruits, preventing overlapping clusters. `0` disables the check.
+- **`minHeight`** / **`maxHeight`**: Restricts fruits to a vertical band of the canopy, as fractions (`0` to `1`) of the anchor height range.
+- **`twigRadius`**: When `anchor` is `Twigs`, only branch sections thinner than this radius can bear fruit.
+- **`size`**: Size of the fruits, represented as a numeric value.
+- **`sizeVariance`**: Specifies how much variance in size each fruit instance should have.
+- **`gravity`**: Blends fruit orientation from following the leaf direction (`0`) to hanging straight down (`1`).
+- **`tilt`**: Maximum random tilt applied to each fruit, in degrees.
+- **`outward`**: Distance each fruit is pushed along its anchor direction, pulling it out of the foliage.
+- **`hang`**: Distance each fruit is dropped below its anchor.
+- **`tint`**: Tint color applied to the fruits, defined as a hexadecimal color value (e.g., `0xffffff` for white).
+- **`colorVariance`**: Amount of random hue, saturation and lightness variation per fruit.
+- **`sway`**: Maximum wind sway angle around the stem, in degrees.
+- **`swaySpeed`**: Speed of the wind sway animation.
+
+The **Shake Tree** button makes the fruits fall, bounce and settle on the ground before growing back. When exporting a GLB, fruits are written as plain nodes sharing a single mesh, so viewers without `EXT_mesh_gpu_instancing` support display every fruit.

@@ -4,6 +4,7 @@ import { zipSync } from 'three/addons/libs/fflate.module.js';
 import { Billboard, TreePreset, Tree, TreeType } from '@dgreenheck/ez-tree';
 import { BarkType, LeafType, applyTreeTextures, loadPresetWithTextures } from './textures';
 import { Environment } from './environment';
+import { FruitAnchor, FruitModels } from './fruits';
 import { OrbitControls } from 'three/examples/jsm/Addons.js';
 import { version } from '../../package.json';
 
@@ -60,7 +61,19 @@ const icons = {
     <path stroke-linecap="round" stroke-linejoin="round" d="m21 7.5-2.25-1.313M21 7.5v2.25m0-2.25-2.25 1.313M3 7.5l2.25-1.313M3 7.5l2.25 1.313M3 7.5v2.25m9 3-2.25-1.313M12 12.75l2.25-1.313M12 12.75V15m0 6.75-2.25-1.313M12 21.75V19.5m0 2.25 2.25-1.313m0-16.875L12 2.25l-2.25 1.313M21 14.25v2.25l-2.25 1.313m-13.5 0L3 16.5v-2.25" />
   </svg>`,
 
+  fruit: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 7.5c-1.2-.9-2.6-1.2-4-1-2.9.5-4.5 3.4-4 6.6.6 4 3.4 7.4 5.8 7.4.8 0 1.4-.4 2.2-.4s1.4.4 2.2.4c2.4 0 5.2-3.4 5.8-7.4.5-3.2-1.1-6.1-4-6.6-1.4-.2-2.8.1-4 1Zm0 0V4.5m0 0c.3-1.2 1.5-2.1 3-2.25-.1 1.4-1.3 2.4-3 2.25Z" />
+  </svg>`,
+
   // Button icons
+  shake: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v10.5m0 0-2.25 2.25M12 13.5l2.25 2.25M6 6.75C4.5 8.25 4.5 11.25 6 12.75m12-6c1.5 1.5 1.5 4.5 0 6M8.25 18.75h.008v.008H8.25v-.008Zm3.75 2.25h.008v.008H12V21Zm3.75-2.25h.008v.008h-.008v-.008Z" />
+  </svg>`,
+
+  upload: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+  </svg>`,
+
   dice: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
     <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 8.25V6a2.25 2.25 0 0 0-2.25-2.25H6A2.25 2.25 0 0 0 3.75 6v8.25A2.25 2.25 0 0 0 6 16.5h2.25m8.25-8.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-7.5A2.25 2.25 0 0 1 8.25 18v-1.5m8.25-8.25h-6a2.25 2.25 0 0 0-2.25 2.25v6" />
   </svg>`,
@@ -453,8 +466,9 @@ let controls = [];
  * @param {THREE.Camera} camera
  * @param {OrbitControls} orbitControls
  * @param {String} initialPreset
+ * @param {import('./fruits').Fruits} fruits
  */
-export function setupUI(tree, environment, renderer, scene, camera, orbitControls, initialPreset) {
+export function setupUI(tree, environment, renderer, scene, camera, orbitControls, initialPreset, fruits) {
   const container = document.getElementById('ui-container');
   container.innerHTML = '';
   controls = [];
@@ -936,6 +950,160 @@ export function setupUI(tree, environment, renderer, scene, camera, orbitControl
 
   parametersTab.appendChild(leavesSection.element);
 
+  // ----- Fruits Section -----
+  // Fruit sliders only re-scatter instances (no tree regeneration), so they
+  // stay live while dragging.
+  const fruitsSection = createSection('Fruits', 'fruit', false);
+  const fo = fruits.options;
+  const scatter = () => fruits.scatter();
+  const fruitControl = (control, update) => {
+    controls.push({ control, update });
+    return control;
+  };
+
+  const fruitEnabledToggle = createToggle('Enabled', fo.enabled, (val) => fruits.setEnabled(val));
+  fruitsSection.add(fruitControl(fruitEnabledToggle, () => fruitEnabledToggle.setValue(fo.enabled)));
+
+  const fruitModelSelect = createSelect('Model',
+    Object.fromEntries(Object.keys(FruitModels).map((name) => [name, name])),
+    fo.model,
+    (val) => fruits.useModel(val).catch((err) => console.error(err)),
+  );
+  fruitsSection.add(fruitModelSelect);
+  const fruitModelSelectEl = fruitModelSelect.element.querySelector('select');
+
+  /** Registers an uploaded GLB as a fruit model and switches to it */
+  async function addFruitModel(file) {
+    try {
+      const name = await fruits.loadModel(await file.arrayBuffer(), file.name.replace(/\.(glb|gltf)$/i, ''));
+      const option = document.createElement('option');
+      option.value = name;
+      option.textContent = name;
+      fruitModelSelectEl.appendChild(option);
+      fruitModelSelectEl.value = name;
+      if (!fo.enabled) {
+        fruits.setEnabled(true);
+        refreshAllControls();
+      }
+      await fruits.useModel(name);
+    } catch (err) {
+      console.error('Could not load fruit model:', err);
+      alert(`Could not load "${file.name}": ${err.message ?? err}`);
+    }
+  }
+
+  const fruitFileInput = document.createElement('input');
+  fruitFileInput.type = 'file';
+  fruitFileInput.accept = '.glb,.gltf';
+  fruitFileInput.style.display = 'none';
+  fruitFileInput.addEventListener('change', async () => {
+    const file = fruitFileInput.files[0];
+    fruitFileInput.value = '';
+    if (file) await addFruitModel(file);
+  });
+  fruitsSection.content.appendChild(fruitFileInput);
+
+  fruitsSection.add(createButton('Upload GLB…', 'upload', () => fruitFileInput.click()));
+  fruitsSection.add(createButton('Shake Tree', 'shake', () => fruits.shake()));
+
+  const fruitSeedSlider = createSlider('Seed', fo.seed, 0, 65536, 1, (val) => {
+    fo.seed = val;
+    fruits.scatter({ pop: true });
+  });
+
+  fruitsSection.add(createButton('Reseed Fruits', 'dice', () => {
+    fo.seed = Math.floor(Math.random() * 65536);
+    fruitSeedSlider.setValue(fo.seed);
+    fruits.scatter({ pop: true });
+  }));
+
+  const fruitCountDisplay = createDisplay('Fruits', fruits.count, (v) => Math.round(v).toLocaleString());
+  fruitsSection.add(fruitCountDisplay);
+  const fruitTriDisplay = createDisplay('Fruit Triangles', fruits.triangleCount, (v) => Math.round(v).toLocaleString());
+  fruitsSection.add(fruitTriDisplay);
+  fruits.onScatter = () => {
+    fruitCountDisplay.setValue(fruits.count);
+    fruitTriDisplay.setValue(fruits.triangleCount);
+  };
+
+  /** Adds an options slider that re-scatters live */
+  const fruitSlider = (parent, label, key, min, max, step, onSet = scatter) => {
+    const slider = createSlider(label, fo[key], min, max, step, (val) => {
+      fo[key] = val;
+      onSet();
+    });
+    parent.add(fruitControl(slider, () => slider.setValue(fo[key])));
+    return slider;
+  };
+
+  const fruitPlacement = createSubSection('Placement', true);
+  const fruitAnchorSelect = createSelect('Grow On', FruitAnchor, fo.anchor, (val) => {
+    fo.anchor = val;
+    fruits.scatter({ pop: true });
+  });
+  fruitPlacement.add(fruitControl(fruitAnchorSelect, () => fruitAnchorSelect.setValue(fo.anchor)));
+  fruitSlider(fruitPlacement, 'Density', 'density', 0, 1, 0.01);
+  fruitSlider(fruitPlacement, 'Max Count', 'maxCount', 0, 2000, 1);
+  fruitSlider(fruitPlacement, 'Spacing', 'spacing', 0, 10, 0.1);
+  fruitSlider(fruitPlacement, 'Min Height', 'minHeight', 0, 1, 0.01);
+  fruitSlider(fruitPlacement, 'Max Height', 'maxHeight', 0, 1, 0.01);
+  fruitSlider(fruitPlacement, 'Twig Radius', 'twigRadius', 0.01, 2, 0.01);
+  fruitPlacement.add(fruitControl(fruitSeedSlider, () => fruitSeedSlider.setValue(fo.seed)));
+  fruitsSection.add(fruitPlacement);
+
+  const fruitShape = createSubSection('Shape');
+  fruitSlider(fruitShape, 'Size', 'size', 0.05, 10, 0.05);
+  fruitSlider(fruitShape, 'Size Variance', 'sizeVariance', 0, 1, 0.01);
+  fruitSlider(fruitShape, 'Gravity', 'gravity', 0, 1, 0.01);
+  fruitSlider(fruitShape, 'Tilt', 'tilt', 0, 90, 1);
+  fruitSlider(fruitShape, 'Outward', 'outward', -2, 5, 0.05);
+  fruitSlider(fruitShape, 'Hang', 'hang', -2, 5, 0.05);
+  fruitsSection.add(fruitShape);
+
+  const fruitColor = createSubSection('Color');
+  const fruitTintPicker = createColorPicker('Tint', fo.tint, (val) => {
+    fo.tint = val;
+    scatter();
+  });
+  fruitColor.add(fruitControl(fruitTintPicker, () => fruitTintPicker.setValue(fo.tint)));
+  fruitSlider(fruitColor, 'Color Variance', 'colorVariance', 0, 1, 0.01);
+  fruitsSection.add(fruitColor);
+
+  const fruitMotion = createSubSection('Motion');
+  fruitSlider(fruitMotion, 'Sway', 'sway', 0, 30, 0.5, () => fruits.syncUniforms());
+  fruitSlider(fruitMotion, 'Sway Speed', 'swaySpeed', 0, 6, 0.1, () => fruits.syncUniforms());
+  fruitsSection.add(fruitMotion);
+
+  parametersTab.appendChild(fruitsSection.element);
+
+  // Drop a .glb anywhere on the page to hang it on the tree
+  const isFileDrag = (e) => e.dataTransfer?.types?.includes('Files');
+  let dragDepth = 0;
+  window.addEventListener('dragenter', (e) => {
+    if (!isFileDrag(e)) return;
+    dragDepth++;
+    document.body.classList.add('fruit-drop');
+  });
+  window.addEventListener('dragleave', (e) => {
+    if (!isFileDrag(e)) return;
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) document.body.classList.remove('fruit-drop');
+  });
+  window.addEventListener('dragover', (e) => {
+    if (isFileDrag(e)) e.preventDefault();
+  });
+  window.addEventListener('drop', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    dragDepth = 0;
+    document.body.classList.remove('fruit-drop');
+    const file = [...e.dataTransfer.files].find((f) => /\.(glb|gltf)$/i.test(f.name));
+    if (file) {
+      fruitsSection.setExpanded(true);
+      addFruitModel(file);
+    }
+  });
+
   // ----- Trellis Section -----
   const trellisSection = createSection('Trellis', 'share', false);
 
@@ -1166,6 +1334,14 @@ export function setupUI(tree, environment, renderer, scene, camera, orbitControl
       setPreviewLevel(0);
     }
     const restoreTextures = stripBrokenTextures(tree);
+    // Swap the instanced fruits for plain nodes so viewers without
+    // EXT_mesh_gpu_instancing support see every fruit
+    const fruitsAttached = fruits.parent === tree;
+    const exportFruits = fruitsAttached ? fruits.createExportGroup() : null;
+    if (fruitsAttached) {
+      tree.remove(fruits);
+      tree.add(exportFruits);
+    }
     try {
       await paint();
       const glb = await new Promise((resolve, reject) =>
@@ -1179,6 +1355,11 @@ export function setupUI(tree, environment, renderer, scene, camera, orbitControl
     } catch (err) {
       console.error(err);
     } finally {
+      if (fruitsAttached) {
+        tree.remove(exportFruits);
+        tree.add(fruits);
+        exportFruits.traverse((o) => [o.material].flat().forEach((m) => m?.dispose()));
+      }
       restoreTextures();
       if (restoreLevel !== 0) {
         setPreviewLevel(restoreLevel);

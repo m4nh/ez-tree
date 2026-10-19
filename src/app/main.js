@@ -5,6 +5,7 @@ import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { setupUI } from './ui';
 import { createScene } from './scene';
+import { Fruits } from './fruits';
 
 document.addEventListener('DOMContentLoaded', async () => {
   const container = document.getElementById('app')
@@ -24,6 +25,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const { scene, environment, tree, camera, controls } = await createScene(renderer);
 
+  // Fruits ride along as a child of the hero tree and re-scatter whenever
+  // the tree regenerates
+  const fruits = new Fruits(tree);
+  fruits.useModel(fruits.options.model).catch((err) => console.error('Failed to load fruit model:', err));
+
   const composer = new EffectComposer(renderer);
 
   composer.addPass(new RenderPass(scene, camera));
@@ -40,6 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Update time for wind sway shaders
     const t = clock.getElapsedTime();
     tree.update(t);
+    fruits.update(t);
     scene.getObjectByName('Forest').children.forEach((o) => o.update(t));
     environment.update(t);
 
@@ -58,7 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   window.addEventListener('resize', resize);
 
-  setupUI(tree, environment, renderer, scene, camera, controls, 'Ash Medium');
+  setupUI(tree, environment, renderer, scene, camera, controls, 'Ash Medium', fruits);
   animate();
   resize();
 

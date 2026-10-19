@@ -1227,3 +1227,21 @@ a {
     animation-duration: 0.01ms !important;
   }
 }
+
+/* Drop a .glb on the page to use it as a fruit model */
+body.fruit-drop #app::after {
+  content: 'Drop GLB to grow it on the tree';
+  position: fixed;
+  inset: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius-lg);
+  background: rgba(var(--glass-tint), 0.35);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 20px;
+  pointer-events: none;
+  z-index: 10;
+}
